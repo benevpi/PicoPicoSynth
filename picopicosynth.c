@@ -101,13 +101,13 @@ struct audio_buffer_pool *init_audio() {
     bool __unused ok;
     const struct audio_format *output_format;
 
-    output_format = pio_pwm_audio_setup(&audio_format, -1, &default_mono_channel_config); //-1 is don't care about latency
+    output_format = audio_pwm_setup(&audio_format, -1, &default_mono_channel_config); //-1 is don't care about latency
     if (!output_format) {
         panic("MuAudio: Unable to open audio device.\n");
     }
-    ok = pio_pwm_audio_default_connect(producer_pool, false); // the true dedicates core 1 to doing audio gubbins -- doesn't seem to work?. maybe need to enable multicore? --looking at source, it's not implemented yet
+    ok = audio_pwm_default_connect(producer_pool, false); // the true dedicates core 1 to doing audio gubbins -- doesn't seem to work?. maybe need to enable multicore? --looking at source, it's not implemented yet
     assert(ok);
-    pio_pwm_audio_enable(true);
+    audio_pwm_set_enabled(true);
 
     return producer_pool;
 }
@@ -231,14 +231,14 @@ int16_t read_echo(int16_t buffer[], int buffer_len, int posn_absolute, int delay
 int main() {
 	//do we really need this?
 	//does seem to work a little better
-	set_sys_clock_48();
+	set_sys_clock_48mhz();
 	//setup our button
 	gpio_init(BUTTON_GPIO);
-    gpio_dir(BUTTON_GPIO, GPIO_IN);
+    gpio_set_dir(BUTTON_GPIO, GPIO_IN);
     gpio_pull_up(BUTTON_GPIO);
 	
 	//should there be any sort of debounce here?
-	gpio_irq_enable_with_callback(BUTTON_GPIO, GPIO_IRQ_EDGE_FALL, true, &button_callback);
+	gpio_set_irq_enabled_with_callback(BUTTON_GPIO, GPIO_IRQ_EDGE_FALL, true, &button_callback);
 
 
 
@@ -266,9 +266,9 @@ int main() {
 	
 	int posn_echo = 0;
 	
-	enum audio_correction_mode m = pio_pwm_audio_get_correction_mode();
+	enum audio_correction_mode m = audio_pwm_get_correction_mode();
 	m = fixed_dither;
-	pio_pwm_audio_set_correction_mode(m);
+	audio_pwm_set_correction_mode(m);
 	
     while (true) {
 		
