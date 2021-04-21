@@ -1,7 +1,5 @@
 /**
- * some code from pico-playground
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- * some code from Ben Everard
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,8 +8,12 @@
 #include <math.h>
 #include "bongo.h"
 
+//For the Pimoroni Audio pack
 #define PICO_AUDIO_I2S_DATA_PIN 9
 #define PICO_AUDIO_I2S_CLOCK_PIN_BASE 10
+
+//let's just do mono for now.
+#define PICO_AUDIO_I2S_MONO_OUTPUT 1
 
 #if PICO_ON_DEVICE
 
@@ -22,19 +24,19 @@
 
 #include "pico/stdlib.h"
 
-#if USE_AUDIO_I2S
+
 
 #include "pico/audio_i2s.h"
 
-#elif USE_AUDIO_PWM
-#include "pico/audio_pwm.h"
-#elif USE_AUDIO_SPDIF
-#include "pico/audio_spdif.h"
-#endif
+
+//note -- will have to include this in the cmake file
+#include "hardware/gpio.h"
 
 #define SINE_WAVE_TABLE_LEN 2048
 #define SAMPLES_PER_BUFFER 256
 
+//There is definately a better way of storing all this
+//actually, this shouldn't be needed any more
 #define HIGHBEATFREQ 1.2
 #define LOWBEATFREQ 4.8
 
@@ -52,6 +54,33 @@
 //this gives a max echo of 1 second
 #define ECHOBUFFERLEN 22050
 
+/**TODO
+# weird blip if there's echo on bongos and sine all at the same time. Not sure if running out of resources or something else.
+# would like to try with I2S maybe.
+#this may be fixed (ish) in the audio correction mode
+#should still try I2S
+
+# Defo needs flashing lights. Hook up some neoPixels and maybe buttons to control the sequencer
+
+
+##getting some clicks and hisses -- could this be noise on the ground when doing a lot of processing?
+#fix saw / square wobbler blinps
+# add some effects
+## echo (could also be used for chorus)
+### needs a circular buffer
+### or could just be a regular buffer that's kicked off on envelope & noenvelope
+### or could just hold a separate posn_absolute (posn_echo) and echo_len and run some more inputs to the mixers. -- this won't work as it'll mess with the beat numbers, etc.
+# Also, can I pull the functions out into a separate file so they can be used elsewhere?
+
+# how to make it physical computing?
+## neopixels that light up the beat number?
+## take user input? Get a irq on a GPIO and use that to trigger certain sounds
+### Done, but should it there be a bit more debouncing than a simple falling edge?
+## use a potentiometer to control pitch / frequency?
+
+**/
+
+
 static int16_t sine_wave_table[SINE_WAVE_TABLE_LEN];
 static int16_t bongo_wave_table[BONGOSAMPLES];
 static int16_t echo_table[ECHOBUFFERLEN];
@@ -60,30 +89,27 @@ static int16_t calc_samples[SAMPLES_PER_BUFFER];
 uint32_t button_last_pressed = 0;
 uint32_t posn_absolute = 0;
 
-static int16_t sine_wave_table[SINE_WAVE_TABLE_LEN];
-
+//currently documentation incomplete on this. Need to have a read over what various settings do when it's finished.
 struct audio_buffer_pool *init_audio() {
 
-    static audio_format_t audio_format = {
+    static struct audio_format audio_format = {
             .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-#if USE_AUDIO_SPDIF
-            .sample_freq = 44100,
-#else
             .sample_freq = 24000,
-#endif
             .channel_count = 1,
     };
+
 
     static struct audio_buffer_format producer_format = {
             .format = &audio_format,
             .sample_stride = 2
     };
 
+	//this says there should be three buffers.
     struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3,
                                                                       SAMPLES_PER_BUFFER); // todo correct size
     bool __unused ok;
     const struct audio_format *output_format;
-#if USE_AUDIO_I2S
+
     struct audio_i2s_config config = {
             .data_pin = PICO_AUDIO_I2S_DATA_PIN,
             .clock_pin_base = PICO_AUDIO_I2S_CLOCK_PIN_BASE,
@@ -99,24 +125,8 @@ struct audio_buffer_pool *init_audio() {
     ok = audio_i2s_connect(producer_pool);
     assert(ok);
     audio_i2s_set_enabled(true);
-#elif USE_AUDIO_PWM
-    output_format = audio_pwm_setup(&audio_format, -1, &default_mono_channel_config);
-    if (!output_format) {
-        panic("PicoAudio: Unable to open audio device.\n");
-    }
-    ok = audio_pwm_default_connect(producer_pool, false);
-    assert(ok);
-    audio_pwm_set_enabled(true);
-#elif USE_AUDIO_SPDIF
-    output_format = audio_spdif_setup(&audio_format, &audio_spdif_default_config);
-    if (!output_format) {
-        panic("PicoAudio: Unable to open audio device.\n");
-    }
-    //ok = audio_spdif_connect(producer_pool);
-    ok = audio_spdif_connect(producer_pool);
-    assert(ok);
-    audio_spdif_set_enabled(true);
-#endif
+
+
     return producer_pool;
 }
 
@@ -298,7 +308,7 @@ int main() {
 			//the alternative to this, I think, would be to feed the output into a buffer large enough to apply the tremello effect in there
 			posn_low_sine = posn_low_sine + 1 + triangle_wobbler(2000,0.5,posn_absolute);
 			
-			
+			/**
 			//bongos
 			//I think this is what's going weird?nope 
 			inputs[0] = create_echo(no_envelope(bongo_wave_table, BONGOSAMPLES, 1, sequence(bongo_sequence, posn_absolute, beat_num, last_loop_posn))
@@ -321,20 +331,20 @@ int main() {
 			
 			//echo of bongos
 			
-			
+			/**
 			
 			inputs[3] = read_echo(echo_table, ECHOBUFFERLEN, posn_absolute, 2000);
 			
 			
 			samples[i] = mixer(inputs, volumes, mixer_size);
-			
+			**/
 			
 			//simple test
-			/**
+			
 			inputs[0] = envelope(sine_wave_table, SINE_WAVE_TABLE_LEN, 8, posn_low_sine, sequence(low_sine_sequence, posn_absolute, beat_num, last_loop_posn), 
 												5000, 10000, 15000, 40000);
 			samples[i] = mixer(inputs, volumes, 1);
-			**/								
+												
 			
 			posn_absolute++;
 			if (posn_absolute > 2000000000) { posn_absolute = 0;} // ugly hack. Should do something better --this will also break the sequencer -- only causes a problem after 2 1/2 hours, so could just leave it for now.
