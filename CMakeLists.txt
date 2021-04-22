@@ -8,11 +8,15 @@ project(picopicosynth_example1)
 pico_sdk_init()
 
 ADD_LIBRARY(PicoPicoSynth picopicosynth.c)
-target_link_libraries(PicoPicoSynth pico_stdlib)
+target_link_libraries(PicoPicoSynth pico_stdlib pico_audio_i2s)
 
 add_executable(picopicosynth_example1
 	example_synth.c
 )
+
+# enable usb output, disable uart output
+    pico_enable_stdio_usb(picopicosynth_example1 1)
+    pico_enable_stdio_uart(picopicosynth_example1 0)
 
 target_link_libraries(picopicosynth_example1 PRIVATE
 	pico_stdlib
