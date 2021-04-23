@@ -4,9 +4,14 @@
 #define I2S 1
 #define SPDIF 2
 
+struct wavetable {
+	int length;
+	int16_t samples[];
+};
+
 //Things that manipulate sound
-int16_t no_envelope(int16_t wave_table[], int table_len, float table_multiplier, int envelope_posn);
-int16_t envelope(int16_t wave_table[], int table_len, float table_multiplier,float posn_virtual, int envelope_posn, int decay, int sustain, int release, int finish);
+int16_t no_envelope(struct wavetable *this_wavetable, float table_multiplier, int envelope_posn);
+int16_t envelope(struct wavetable *this_wavetable, float table_multiplier,float posn_virtual, int envelope_posn, int decay, int sustain, int release, int finish);
 int16_t mixer(int16_t inputs[], float volumes[], int size);
 int sequence( int note_sequence[], int posn_absolute, int current_beat_num, int last_loop_posn,int beat_num, int beat_freq);
 
@@ -50,6 +55,10 @@ void add_sequence(struct sequencer *this_sequencer, int number, int beats[], int
 struct audio_buffer * fill_next_buffer(struct sequencer *this_sequencer, struct audio_buffer_pool *ap, int num_samples);
 
 struct audio_buffer_pool *init_audio_i2s(int buffer_size, int data_pin, int clock_pin);
+
+struct wavetable * get_sinewave_table(float wave_frequency, float system_frequency);
+
+struct wavetable * create_wavetable(int length);
 
 
 

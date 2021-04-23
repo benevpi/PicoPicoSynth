@@ -8,18 +8,19 @@
 #include "pico/audio_i2s.h"
 
 #include <stdio.h>
+#include <math.h>
 
 
 
-int16_t no_envelope(int16_t wave_table[], int table_len, float table_multiplier, int envelope_posn) {
-	if((envelope_posn*table_multiplier) >= table_len) { return 0; }
+int16_t no_envelope(struct wavetable *this_wavetable, float table_multiplier, int envelope_posn) {
+	if((envelope_posn*table_multiplier) >= this_wavetable->length) { return 0; }
 	
-	return wave_table[(int)(envelope_posn*table_multiplier)] ;
+	return this_wavetable->samples[(int)(envelope_posn*table_multiplier)] ;
 }
 
 //note posn_virtual only works out-the-box with continuous waves.
 // can probably be made to work with samples, but will need a little thought.
-int16_t envelope(int16_t wave_table[], int table_len, float table_multiplier,float posn_virtual, int envelope_posn, int decay, int sustain, int release, int finish) {
+int16_t envelope(struct wavetable *this_wavetable, float table_multiplier,float posn_virtual, int envelope_posn, int decay, int sustain, int release, int finish) {
 	float attack_multiplier = 1;
 	float sustain_multiplier = 0.5;
 	float proportion = 0;
@@ -41,7 +42,7 @@ int16_t envelope(int16_t wave_table[], int table_len, float table_multiplier,flo
 	else {
 		proportion = ((float)envelope_posn / decay) * attack_multiplier;
 	}
-	return wave_table[(int)((float)posn_virtual*table_multiplier) % table_len ] * proportion;
+	return this_wavetable->samples[(int)((float)posn_virtual*table_multiplier) % this_wavetable->length ] * proportion;
 }
 
 int16_t mixer(int16_t inputs[], float volumes[], int size) {
@@ -254,4 +255,25 @@ struct audio_buffer_pool *init_audio_i2s(int buffer_size, int data_pin, int cloc
 	audio_i2s_set_enabled(true);
 
     return producer_pool;
+}
+
+
+
+struct wavetable * get_sinewave_table(float wave_frequency, float system_frequency) {
+	int length = system_frequency / wave_frequency;
+	struct wavetable *this_wavetable = malloc( sizeof(struct wavetable) + sizeof(int16_t)*length);
+	
+	this_wavetable->length = length;
+	
+	for (int i = 0; i < length; i++) {
+        this_wavetable->samples[i] = 32767 * cosf(i * 2 * (float) (M_PI / length));
+    }
+	
+	return this_wavetable;
+}
+
+struct wavetable * create_wavetable(int length) {
+	struct wavetable *this_wavetable = malloc( sizeof(struct wavetable) + sizeof(int16_t)*length);
+	this_wavetable->length = length;	
+	return this_wavetable;
 }
