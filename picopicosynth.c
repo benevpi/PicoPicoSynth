@@ -222,7 +222,6 @@ struct audio_buffer_pool *init_audio_i2s(int buffer_size, int data_pin, int cloc
 
     static audio_format_t audio_format = {
             .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-            
             .sample_freq = 24000,
             .channel_count = 1,
     };
